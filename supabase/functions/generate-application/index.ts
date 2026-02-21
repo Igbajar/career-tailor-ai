@@ -1,0 +1,202 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const { jobDescription, profile, experiences, skills } = await req.json();
+
+    if (!jobDescription) {
+      return new Response(JSON.stringify({ error: "Job description is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const profileContext = profile
+      ? `
+Candidate Profile:
+- Name: ${profile.full_name || "Not provided"}
+- Email: ${profile.email || "Not provided"}
+- Phone: ${profile.phone || "Not provided"}
+- Location: ${profile.location || "Not provided"}
+- LinkedIn: ${profile.linkedin || "Not provided"}
+- Portfolio: ${profile.portfolio || "Not provided"}
+- Summary: ${profile.summary || "Not provided"}
+`
+      : "No profile data available.";
+
+    const expContext =
+      experiences && experiences.length > 0
+        ? `
+Work Experience:
+${experiences.map((e: any) => `- ${e.title} at ${e.company} (${e.period || "N/A"}): ${e.description || "No description"}`).join("\n")}
+`
+        : "No work experience provided.";
+
+    const skillsContext =
+      skills && skills.length > 0
+        ? `Skills: ${skills.map((s: any) => s.name).join(", ")}`
+        : "No skills provided.";
+
+    const systemPrompt = `You are an expert career consultant and ATS optimization specialist. You analyze job descriptions and generate tailored CVs and cover letters.
+
+You must return structured output using the provided tool.
+
+Guidelines:
+- Extract key requirements from the job description
+- Match candidate experience and skills to requirements
+- Reorder and rephrase experience bullets to emphasize relevance
+- Use keywords from the job description naturally
+- Calculate an ATS match score (0-100) based on keyword coverage
+- Write a compelling, personalized cover letter
+- Keep the cover letter under 400 words
+- Use professional but engaging tone`;
+
+    const userPrompt = `Here is the candidate's information:
+
+${profileContext}
+${expContext}
+${skillsContext}
+
+Here is the job description to tailor the application for:
+
+${jobDescription}
+
+Generate a tailored CV summary, optimized experience descriptions, and a personalized cover letter.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "generate_application",
+              description: "Generate a tailored CV and cover letter for a job application",
+              parameters: {
+                type: "object",
+                properties: {
+                  ats_score: {
+                    type: "number",
+                    description: "ATS match score from 0 to 100",
+                  },
+                  keywords_matched: {
+                    type: "number",
+                    description: "Number of keywords matched from job description",
+                  },
+                  keywords_total: {
+                    type: "number",
+                    description: "Total keywords identified in job description",
+                  },
+                  tailored_summary: {
+                    type: "string",
+                    description: "A tailored professional summary for the CV",
+                  },
+                  tailored_experiences: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        company: { type: "string" },
+                        period: { type: "string" },
+                        description: { type: "string", description: "Rewritten description optimized for this role" },
+                      },
+                      required: ["title", "company", "period", "description"],
+                    },
+                    description: "Reordered and rewritten experiences optimized for this job",
+                  },
+                  cover_letter: {
+                    type: "string",
+                    description: "A personalized cover letter for this application",
+                  },
+                  company_name: {
+                    type: "string",
+                    description: "The company name extracted from the job description",
+                  },
+                  role_title: {
+                    type: "string",
+                    description: "The role title extracted from the job description",
+                  },
+                },
+                required: [
+                  "ats_score",
+                  "keywords_matched",
+                  "keywords_total",
+                  "tailored_summary",
+                  "tailored_experiences",
+                  "cover_letter",
+                  "company_name",
+                  "role_title",
+                ],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "generate_application" } },
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error(`AI gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+
+    if (!toolCall?.function?.arguments) {
+      throw new Error("AI did not return structured output");
+    }
+
+    const result = JSON.parse(toolCall.function.arguments);
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("generate-application error:", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
