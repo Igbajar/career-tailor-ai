@@ -14,7 +14,216 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cv_uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_type: string | null
+          id: string
+          is_master: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_type?: string | null
+          id?: string
+          is_master?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_type?: string | null
+          id?: string
+          is_master?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      education: {
+        Row: {
+          created_at: string
+          degree: string
+          description: string | null
+          id: string
+          institution: string
+          period: string | null
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          degree: string
+          description?: string | null
+          id?: string
+          institution: string
+          period?: string | null
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          degree?: string
+          description?: string | null
+          id?: string
+          institution?: string
+          period?: string | null
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      experiences: {
+        Row: {
+          company: string
+          created_at: string
+          description: string | null
+          id: string
+          period: string | null
+          sort_order: number | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          period?: string | null
+          sort_order?: number | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          period?: string | null
+          sort_order?: number | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      job_applications: {
+        Row: {
+          applied_at: string
+          ats_score: number | null
+          company: string
+          generated_cover_letter_path: string | null
+          generated_cv_path: string | null
+          id: string
+          job_description: string | null
+          location: string | null
+          role: string
+          salary_range: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string
+          ats_score?: number | null
+          company: string
+          generated_cover_letter_path?: string | null
+          generated_cv_path?: string | null
+          id?: string
+          job_description?: string | null
+          location?: string | null
+          role: string
+          salary_range?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applied_at?: string
+          ats_score?: number | null
+          company?: string
+          generated_cover_letter_path?: string | null
+          generated_cv_path?: string | null
+          id?: string
+          job_description?: string | null
+          location?: string | null
+          role?: string
+          salary_range?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          linkedin: string | null
+          location: string | null
+          phone: string | null
+          portfolio: string | null
+          summary: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          linkedin?: string | null
+          location?: string | null
+          phone?: string | null
+          portfolio?: string | null
+          summary?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          linkedin?: string | null
+          location?: string | null
+          phone?: string | null
+          portfolio?: string | null
+          summary?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      skills: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
