@@ -6,13 +6,13 @@ import {
   Briefcase, 
   FileOutput, 
   ClipboardList,
-  Settings,
   LogOut,
   ChevronLeft,
   Menu
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -27,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -118,9 +119,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xs font-semibold text-primary-foreground">JD</span>
+              <span className="text-xs font-semibold text-primary-foreground">
+                {user?.email?.[0]?.toUpperCase() || "U"}
+              </span>
             </div>
+            <button
+              onClick={signOut}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         </header>
 

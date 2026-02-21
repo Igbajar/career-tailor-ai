@@ -1,6 +1,9 @@
 import { motion } from "framer-motion";
-import { User, Briefcase, GraduationCap, Wrench, Award, BookOpen, FolderOpen, Upload, Edit, Plus, Save } from "lucide-react";
-import { useState } from "react";
+import { User, Briefcase, GraduationCap, Wrench, Award, BookOpen, FolderOpen, Upload, Edit, Plus, Save, FileUp, Check, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const sections = [
   { id: "personal", label: "Personal Info", icon: User },
@@ -34,6 +37,60 @@ const mockSkills = [
 
 export default function Profile() {
   const [activeSection, setActiveSection] = useState("personal");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Please upload a PDF or DOCX file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File must be smaller than 10MB");
+      return;
+    }
+    setUploadedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadedFile || !user) return;
+    setUploading(true);
+
+    try {
+      const filePath = `${user.id}/${Date.now()}_${uploadedFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("cv-uploads")
+        .upload(filePath, uploadedFile);
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from("cv_uploads" as any)
+        .insert({
+          user_id: user.id,
+          file_name: uploadedFile.name,
+          file_path: filePath,
+          file_type: uploadedFile.type,
+          is_master: true,
+        } as any);
+
+      if (dbError) throw dbError;
+
+      toast.success("CV uploaded successfully!");
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error: any) {
+      toast.error(error.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -47,10 +104,34 @@ export default function Profile() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium text-sm hover:bg-secondary/80 transition-colors">
-            <Upload className="w-4 h-4" />
-            Upload CV
-          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          {uploadedFile ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground truncate max-w-[140px]">{uploadedFile.name}</span>
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-success text-success-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {uploading ? "Uploading..." : "Confirm Upload"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium text-sm hover:bg-secondary/80 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Upload CV
+            </button>
+          )}
           <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity shadow-sm">
             <Save className="w-4 h-4" />
             Save Changes
@@ -87,27 +168,27 @@ export default function Profile() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Full Name</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="John Doe" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="" placeholder="Your full name" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Email</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="john.doe@email.com" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue={user?.email || ""} readOnly />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Phone</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="+1 (555) 123-4567" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="+1 (555) 123-4567" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Location</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="San Francisco, CA" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="San Francisco, CA" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">LinkedIn</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="linkedin.com/in/johndoe" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="linkedin.com/in/yourname" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Portfolio</label>
-                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" defaultValue="johndoe.dev" />
+                  <input className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="yoursite.com" />
                 </div>
               </div>
               <div>
@@ -115,7 +196,7 @@ export default function Profile() {
                 <textarea
                   rows={4}
                   className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                  defaultValue="Experienced software engineer with 6+ years of expertise in full-stack development, specializing in React, TypeScript, and cloud architecture. Passionate about building scalable systems and mentoring teams."
+                  placeholder="Write a brief professional summary..."
                 />
               </div>
             </motion.div>
@@ -175,25 +256,15 @@ export default function Profile() {
                   <Plus className="w-4 h-4" /> Add Education
                 </button>
               </div>
-              <div className="glass-card rounded-xl p-5 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold text-foreground">MSc Computer Science</h3>
-                    <p className="text-sm text-accent">Stanford University</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">2018 - 2020</span>
+              <div className="glass-card rounded-xl p-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                  <Plus className="w-5 h-5 text-accent" />
                 </div>
-                <p className="text-sm text-muted-foreground">Specialized in Machine Learning and Distributed Systems. GPA: 3.9/4.0</p>
-              </div>
-              <div className="glass-card rounded-xl p-5 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold text-foreground">BSc Software Engineering</h3>
-                    <p className="text-sm text-accent">MIT</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">2014 - 2018</span>
-                </div>
-                <p className="text-sm text-muted-foreground">Dean's List. Capstone project on real-time collaborative editing systems.</p>
+                <h3 className="font-display text-lg font-semibold text-foreground mb-1">Add Education</h3>
+                <p className="text-sm text-muted-foreground mb-4">Start adding your education history.</p>
+                <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity">
+                  <Plus className="w-4 h-4" /> Add Entry
+                </button>
               </div>
             </motion.div>
           )}
