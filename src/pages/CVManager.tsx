@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { FileText, Download, Eye, Trash2, Plus, Clock, Loader2 } from "lucide-react";
+import { FileText, Download, Trash2, Plus, Clock, Loader2, Upload, Check } from "lucide-react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,9 @@ export default function CVManager() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: cvs = [], isLoading } = useQuery({
     queryKey: ["cv_uploads", user?.id],
@@ -50,6 +54,41 @@ export default function CVManager() {
     URL.revokeObjectURL(url);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!validTypes.includes(file.type)) { toast.error("Please upload a PDF or DOCX file"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("File must be smaller than 10MB"); return; }
+    setUploadedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadedFile || !user) return;
+    setUploading(true);
+    try {
+      const filePath = `${user.id}/${Date.now()}_${uploadedFile.name}`;
+      const { error: uploadError } = await supabase.storage.from("cv-uploads").upload(filePath, uploadedFile);
+      if (uploadError) throw uploadError;
+      const { error: dbError } = await supabase.from("cv_uploads").insert({
+        user_id: user.id,
+        file_name: uploadedFile.name,
+        file_path: filePath,
+        file_type: uploadedFile.type,
+        is_master: false,
+      });
+      if (dbError) throw dbError;
+      toast.success("CV uploaded successfully!");
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      queryClient.invalidateQueries({ queryKey: ["cv_uploads", user?.id] });
+    } catch (error: any) {
+      toast.error(error.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -61,13 +100,36 @@ export default function CVManager() {
             Manage your uploaded CVs and create new applications.
           </p>
         </div>
-        <button
-          onClick={() => navigate("/job-input")}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Application
-        </button>
+        <div className="flex gap-3">
+          <input ref={fileInputRef} type="file" accept=".pdf,.docx" onChange={handleFileSelect} className="hidden" />
+          {uploadedFile ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground truncate max-w-[140px]">{uploadedFile.name}</span>
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-success text-success-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {uploading ? "Uploading..." : "Confirm"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium text-sm hover:bg-secondary/80 transition-colors"
+            >
+              <Upload className="w-4 h-4" /> Upload CV
+            </button>
+          )}
+          <button
+            onClick={() => navigate("/job-input")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            New Application
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -77,7 +139,7 @@ export default function CVManager() {
       ) : cvs.length === 0 ? (
         <div className="glass-card rounded-xl p-12 text-center">
           <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-muted-foreground">No CVs uploaded yet. Go to your Profile to upload one.</p>
+          <p className="text-muted-foreground">No CVs uploaded yet. Click "Upload CV" to get started.</p>
         </div>
       ) : (
         <div className="space-y-4">
