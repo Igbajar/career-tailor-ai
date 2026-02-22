@@ -188,9 +188,22 @@ export default function Profile() {
       if (uploadError) throw uploadError;
       const { error: dbError } = await supabase.from("cv_uploads").insert({ user_id: user.id, file_name: uploadedFile.name, file_path: filePath, file_type: uploadedFile.type, is_master: true });
       if (dbError) throw dbError;
-      toast.success("CV uploaded successfully!");
+      toast.success("CV uploaded! Parsing your CV to auto-fill profile...");
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+
+      // Auto-parse CV to fill profile
+      const { error: parseError } = await supabase.functions.invoke("parse-cv", {
+        body: { filePath },
+      });
+      if (parseError) {
+        console.error("CV parse error:", parseError);
+        toast.error("CV uploaded but auto-fill failed. You can fill in manually.");
+      } else {
+        toast.success("Profile auto-filled from your CV!");
+        // Refresh profile data
+        window.location.reload();
+      }
     } catch (error: any) {
       toast.error(error.message || "Upload failed");
     } finally {

@@ -117,6 +117,7 @@ export type Database = {
           company: string
           generated_cover_letter_path: string | null
           generated_cv_path: string | null
+          generated_data: Json | null
           id: string
           job_description: string | null
           location: string | null
@@ -132,6 +133,7 @@ export type Database = {
           company: string
           generated_cover_letter_path?: string | null
           generated_cv_path?: string | null
+          generated_data?: Json | null
           id?: string
           job_description?: string | null
           location?: string | null
@@ -147,6 +149,7 @@ export type Database = {
           company?: string
           generated_cover_letter_path?: string | null
           generated_cv_path?: string | null
+          generated_data?: Json | null
           id?: string
           job_description?: string | null
           location?: string | null
