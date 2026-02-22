@@ -65,6 +65,7 @@ export default function JobInput() {
         status: "Applied",
         ats_score: result.ats_score,
         job_description: jobText,
+        generated_data: result as any,
       });
       if (error) throw error;
       toast.success("Saved to Application Tracker!");
