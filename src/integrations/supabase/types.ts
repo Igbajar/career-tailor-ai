@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      certifications: {
+        Row: {
+          created_at: string
+          date_obtained: string | null
+          description: string | null
+          id: string
+          issuer: string
+          name: string
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_obtained?: string | null
+          description?: string | null
+          id?: string
+          issuer: string
+          name: string
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_obtained?: string | null
+          description?: string | null
+          id?: string
+          issuer?: string
+          name?: string
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cv_uploads: {
         Row: {
           created_at: string
@@ -161,6 +194,39 @@ export type Database = {
         }
         Relationships: []
       }
+      professional_bodies: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          member_since: string | null
+          name: string
+          role: string | null
+          sort_order: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          member_since?: string | null
+          name: string
+          role?: string | null
+          sort_order?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          member_since?: string | null
+          name?: string
+          role?: string | null
+          sort_order?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -199,6 +265,78 @@ export type Database = {
           portfolio?: string | null
           summary?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          period: string | null
+          role: string | null
+          sort_order: number | null
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          period?: string | null
+          role?: string | null
+          sort_order?: number | null
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          period?: string | null
+          role?: string | null
+          sort_order?: number | null
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      publications: {
+        Row: {
+          created_at: string
+          date_published: string | null
+          description: string | null
+          id: string
+          publisher: string
+          sort_order: number | null
+          title: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_published?: string | null
+          description?: string | null
+          id?: string
+          publisher: string
+          sort_order?: number | null
+          title: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_published?: string | null
+          description?: string | null
+          id?: string
+          publisher?: string
+          sort_order?: number | null
+          title?: string
+          url?: string | null
           user_id?: string
         }
         Relationships: []
