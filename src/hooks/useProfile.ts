@@ -22,10 +22,123 @@ export interface ExperienceData {
   sort_order?: number;
 }
 
+export interface EducationData {
+  id?: string;
+  degree: string;
+  institution: string;
+  period: string;
+  description: string;
+  sort_order?: number;
+}
+
 export interface SkillData {
   id?: string;
   name: string;
   category?: string;
+}
+
+export interface CertificationData {
+  id?: string;
+  name: string;
+  issuer: string;
+  date_obtained?: string;
+  description?: string;
+  sort_order?: number;
+}
+
+export interface PublicationData {
+  id?: string;
+  title: string;
+  publisher: string;
+  date_published?: string;
+  description?: string;
+  url?: string;
+  sort_order?: number;
+}
+
+export interface ProjectData {
+  id?: string;
+  name: string;
+  role?: string;
+  period?: string;
+  description?: string;
+  url?: string;
+  sort_order?: number;
+}
+
+export interface ProfessionalBodyData {
+  id?: string;
+  name: string;
+  role?: string;
+  member_since?: string;
+  description?: string;
+  sort_order?: number;
+}
+
+function useCrudQuery(
+  table: string,
+  queryKey: string,
+  orderCol: string = "sort_order"
+) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const fullKey = [queryKey, user?.id];
+
+  const query = useQuery({
+    queryKey: fullKey,
+    queryFn: async (): Promise<any[]> => {
+      if (!user) return [];
+      const { data, error } = await (supabase as any)
+        .from(table)
+        .select("*")
+        .eq("user_id", user.id)
+        .order(orderCol, { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const add = useMutation({
+    mutationFn: async (item: any) => {
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await (supabase as any).from(table).insert({ ...item, user_id: user.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fullKey });
+      toast.success("Added!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const update = useMutation({
+    mutationFn: async ({ id, ...item }: any) => {
+      if (!user || !id) throw new Error("Not authenticated");
+      const { error } = await (supabase as any).from(table).update(item).eq("id", id).eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fullKey });
+      toast.success("Updated!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await (supabase as any).from(table).delete().eq("id", id).eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fullKey });
+      toast.success("Deleted!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return { data: query.data || [], isLoading: query.isLoading, add, update, remove };
 }
 
 export function useProfile() {
@@ -36,43 +149,9 @@ export function useProfile() {
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
       if (error) throw error;
       return data;
-    },
-    enabled: !!user,
-  });
-
-  const experiencesQuery = useQuery({
-    queryKey: ["experiences", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("experiences")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const skillsQuery = useQuery({
-    queryKey: ["skills", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("skills")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data || [];
     },
     enabled: !!user,
   });
@@ -80,10 +159,7 @@ export function useProfile() {
   const updateProfile = useMutation({
     mutationFn: async (profile: Partial<ProfileData>) => {
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("profiles")
-        .update(profile)
-        .eq("user_id", user.id);
+      const { error } = await supabase.from("profiles").update(profile).eq("user_id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -93,96 +169,24 @@ export function useProfile() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const addExperience = useMutation({
-    mutationFn: async (exp: Omit<ExperienceData, "id">) => {
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("experiences")
-        .insert({ ...exp, user_id: user.id });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["experiences", user?.id] });
-      toast.success("Experience added!");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateExperience = useMutation({
-    mutationFn: async ({ id, ...exp }: ExperienceData) => {
-      if (!user || !id) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("experiences")
-        .update(exp)
-        .eq("id", id)
-        .eq("user_id", user.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["experiences", user?.id] });
-      toast.success("Experience updated!");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const deleteExperience = useMutation({
-    mutationFn: async (id: string) => {
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("experiences")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["experiences", user?.id] });
-      toast.success("Experience deleted!");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const addSkill = useMutation({
-    mutationFn: async (skill: Omit<SkillData, "id">) => {
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("skills")
-        .insert({ ...skill, user_id: user.id });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["skills", user?.id] });
-      toast.success("Skill added!");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const deleteSkill = useMutation({
-    mutationFn: async (id: string) => {
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("skills")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["skills", user?.id] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const experiences = useCrudQuery("experiences", "experiences");
+  const education = useCrudQuery("education", "education");
+  const skills = useCrudQuery("skills", "skills", "created_at");
+  const certifications = useCrudQuery("certifications", "certifications");
+  const publications = useCrudQuery("publications", "publications");
+  const projects = useCrudQuery("projects", "projects");
+  const professionalBodies = useCrudQuery("professional_bodies", "professionalBodies");
 
   return {
     profile: profileQuery.data,
-    experiences: experiencesQuery.data || [],
-    skills: skillsQuery.data || [],
-    isLoading: profileQuery.isLoading || experiencesQuery.isLoading || skillsQuery.isLoading,
+    isLoading: profileQuery.isLoading || experiences.isLoading || education.isLoading || skills.isLoading,
     updateProfile,
-    addExperience,
-    updateExperience,
-    deleteExperience,
-    addSkill,
-    deleteSkill,
+    experiences,
+    education,
+    skills,
+    certifications,
+    publications,
+    projects,
+    professionalBodies,
   };
 }

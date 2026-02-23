@@ -21,7 +21,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user
     const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
     const { data: { user }, error: authError } = await anonClient.auth.getUser(
       authHeader?.replace("Bearer ", "") || ""
@@ -41,16 +40,13 @@ serve(async (req) => {
       });
     }
 
-    // Download file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("cv-uploads")
       .download(filePath);
     if (downloadError) throw downloadError;
 
-    // Extract text content from the file
     const text = await fileData.text();
 
-    // Use AI to parse the CV text into structured data
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -62,7 +58,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert CV parser. Extract structured information from CV/resume text. Return structured data using the provided tool. If information is not found, use empty strings or empty arrays. Be thorough in extracting all experiences and skills.`,
+            content: `You are an expert CV parser. Extract ALL structured information from CV/resume text. Return structured data using the provided tool. If information is not found, use empty strings or empty arrays. Be thorough in extracting everything.`,
           },
           {
             role: "user",
@@ -97,10 +93,77 @@ serve(async (req) => {
                       required: ["title", "company"],
                     },
                   },
+                  education: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        degree: { type: "string" },
+                        institution: { type: "string" },
+                        period: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["degree", "institution"],
+                    },
+                  },
                   skills: {
                     type: "array",
                     items: { type: "string" },
                     description: "List of skill names",
+                  },
+                  certifications: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        issuer: { type: "string" },
+                        date_obtained: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["name", "issuer"],
+                    },
+                  },
+                  publications: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        publisher: { type: "string" },
+                        date_published: { type: "string" },
+                        description: { type: "string" },
+                        url: { type: "string" },
+                      },
+                      required: ["title", "publisher"],
+                    },
+                  },
+                  projects: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        role: { type: "string" },
+                        period: { type: "string" },
+                        description: { type: "string" },
+                        url: { type: "string" },
+                      },
+                      required: ["name"],
+                    },
+                  },
+                  professional_bodies: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        role: { type: "string" },
+                        member_since: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["name"],
+                    },
                   },
                 },
                 required: ["full_name", "experiences", "skills"],
@@ -139,29 +202,73 @@ serve(async (req) => {
       await supabase.from("profiles").update(profileUpdate).eq("user_id", user.id);
     }
 
-    // Add experiences
+    // Experiences
     if (parsed.experiences?.length > 0) {
-      // Clear existing experiences first
       await supabase.from("experiences").delete().eq("user_id", user.id);
       const exps = parsed.experiences.map((e: any, i: number) => ({
-        user_id: user.id,
-        title: e.title || "Untitled",
-        company: e.company || "Unknown",
-        period: e.period || "",
-        description: e.description || "",
-        sort_order: i,
+        user_id: user.id, title: e.title || "Untitled", company: e.company || "Unknown",
+        period: e.period || "", description: e.description || "", sort_order: i,
       }));
       await supabase.from("experiences").insert(exps);
     }
 
-    // Add skills
+    // Education
+    if (parsed.education?.length > 0) {
+      await supabase.from("education").delete().eq("user_id", user.id);
+      const edus = parsed.education.map((e: any, i: number) => ({
+        user_id: user.id, degree: e.degree || "Untitled", institution: e.institution || "Unknown",
+        period: e.period || "", description: e.description || "", sort_order: i,
+      }));
+      await supabase.from("education").insert(edus);
+    }
+
+    // Skills
     if (parsed.skills?.length > 0) {
       await supabase.from("skills").delete().eq("user_id", user.id);
-      const skillRows = parsed.skills.map((name: string) => ({
-        user_id: user.id,
-        name,
-      }));
+      const skillRows = parsed.skills.map((name: string) => ({ user_id: user.id, name }));
       await supabase.from("skills").insert(skillRows);
+    }
+
+    // Certifications
+    if (parsed.certifications?.length > 0) {
+      await supabase.from("certifications").delete().eq("user_id", user.id);
+      const certs = parsed.certifications.map((c: any, i: number) => ({
+        user_id: user.id, name: c.name, issuer: c.issuer || "Unknown",
+        date_obtained: c.date_obtained || "", description: c.description || "", sort_order: i,
+      }));
+      await supabase.from("certifications").insert(certs);
+    }
+
+    // Publications
+    if (parsed.publications?.length > 0) {
+      await supabase.from("publications").delete().eq("user_id", user.id);
+      const pubs = parsed.publications.map((p: any, i: number) => ({
+        user_id: user.id, title: p.title, publisher: p.publisher || "Unknown",
+        date_published: p.date_published || "", description: p.description || "",
+        url: p.url || "", sort_order: i,
+      }));
+      await supabase.from("publications").insert(pubs);
+    }
+
+    // Projects
+    if (parsed.projects?.length > 0) {
+      await supabase.from("projects").delete().eq("user_id", user.id);
+      const projs = parsed.projects.map((p: any, i: number) => ({
+        user_id: user.id, name: p.name, role: p.role || "",
+        period: p.period || "", description: p.description || "",
+        url: p.url || "", sort_order: i,
+      }));
+      await supabase.from("projects").insert(projs);
+    }
+
+    // Professional Bodies
+    if (parsed.professional_bodies?.length > 0) {
+      await supabase.from("professional_bodies").delete().eq("user_id", user.id);
+      const bodies = parsed.professional_bodies.map((b: any, i: number) => ({
+        user_id: user.id, name: b.name, role: b.role || "",
+        member_since: b.member_since || "", description: b.description || "", sort_order: i,
+      }));
+      await supabase.from("professional_bodies").insert(bodies);
     }
 
     return new Response(JSON.stringify({ success: true, parsed }), {
