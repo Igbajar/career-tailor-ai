@@ -13,6 +13,34 @@ export interface GeneratedApplication {
     period: string;
     description: string;
   }[];
+  tailored_education?: {
+    degree: string;
+    institution: string;
+    period: string;
+    description: string;
+  }[];
+  tailored_skills?: string[];
+  tailored_certifications?: {
+    name: string;
+    issuer: string;
+    date_obtained?: string;
+  }[];
+  tailored_publications?: {
+    title: string;
+    publisher: string;
+    date_published?: string;
+  }[];
+  tailored_projects?: {
+    name: string;
+    role?: string;
+    period?: string;
+    description: string;
+  }[];
+  tailored_professional_bodies?: {
+    name: string;
+    role?: string;
+    member_since?: string;
+  }[];
   cover_letter: string;
   company_name: string;
   role_title: string;
@@ -99,6 +127,91 @@ export function exportCvPdf(app: GeneratedApplication, profile: ProfileInfo) {
     y += descLines.length * 5 + 6;
   }
 
+  // Education
+  if (app.tailored_education?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("EDUCATION", margin, y); y += 6;
+    for (const edu of app.tailored_education) {
+      if (y > 260) { doc.addPage(); y = margin; }
+      doc.setFontSize(11); doc.setFont("helvetica", "bold");
+      doc.text(edu.degree, margin, y);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.text(edu.period || "", pageWidth - margin, y, { align: "right" }); y += 5;
+      doc.setFontSize(10); doc.setTextColor(100);
+      doc.text(edu.institution, margin, y); doc.setTextColor(0); y += 5;
+      if (edu.description) {
+        const dl = doc.splitTextToSize(edu.description, contentWidth);
+        doc.text(dl, margin, y); y += dl.length * 5 + 4;
+      }
+      y += 2;
+    }
+  }
+
+  // Skills
+  if (app.tailored_skills?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("SKILLS", margin, y); y += 6;
+    doc.setFontSize(10); doc.setFont("helvetica", "normal");
+    const skillText = doc.splitTextToSize(app.tailored_skills.join("  •  "), contentWidth);
+    doc.text(skillText, margin, y); y += skillText.length * 5 + 6;
+  }
+
+  // Certifications
+  if (app.tailored_certifications?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("CERTIFICATIONS", margin, y); y += 6;
+    for (const c of app.tailored_certifications) {
+      if (y > 270) { doc.addPage(); y = margin; }
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(`• ${c.name} — ${c.issuer}${c.date_obtained ? ` (${c.date_obtained})` : ""}`, margin, y); y += 5;
+    }
+    y += 4;
+  }
+
+  // Publications
+  if (app.tailored_publications?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("PUBLICATIONS", margin, y); y += 6;
+    for (const p of app.tailored_publications) {
+      if (y > 270) { doc.addPage(); y = margin; }
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(`• ${p.title} — ${p.publisher}${p.date_published ? ` (${p.date_published})` : ""}`, margin, y); y += 5;
+    }
+    y += 4;
+  }
+
+  // Projects
+  if (app.tailored_projects?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("PROJECTS", margin, y); y += 6;
+    for (const p of app.tailored_projects) {
+      if (y > 260) { doc.addPage(); y = margin; }
+      doc.setFontSize(11); doc.setFont("helvetica", "bold");
+      doc.text(p.name, margin, y); y += 5;
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      const dl = doc.splitTextToSize(p.description, contentWidth);
+      doc.text(dl, margin, y); y += dl.length * 5 + 4;
+    }
+  }
+
+  // Professional Bodies
+  if (app.tailored_professional_bodies?.length) {
+    if (y > 250) { doc.addPage(); y = margin; }
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("PROFESSIONAL MEMBERSHIPS", margin, y); y += 6;
+    for (const b of app.tailored_professional_bodies) {
+      if (y > 270) { doc.addPage(); y = margin; }
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(`• ${b.name}${b.role ? ` — ${b.role}` : ""}${b.member_since ? ` (Since ${b.member_since})` : ""}`, margin, y); y += 5;
+    }
+    y += 4;
+  }
+
   doc.save(`CV_${app.role_title.replace(/\s+/g, "_")}_${app.company_name.replace(/\s+/g, "_")}.pdf`);
 }
 
@@ -107,22 +220,16 @@ export function exportCoverLetterPdf(app: GeneratedApplication, profile: Profile
   const margin = 25;
   let y = margin;
   const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
-
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-
-  // Date
   doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), margin, y);
   y += 12;
-
-  // Letter body
   const lines = doc.splitTextToSize(app.cover_letter, contentWidth);
   doc.text(lines, margin, y);
-
   doc.save(`Cover_Letter_${app.role_title.replace(/\s+/g, "_")}_${app.company_name.replace(/\s+/g, "_")}.pdf`);
 }
 
-export async function exportCvDocx(app: GeneratedApplication, profile: ProfileInfo) {
+
   const children: Paragraph[] = [];
 
   children.push(

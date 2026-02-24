@@ -15,7 +15,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { jobDescription, profile, experiences, skills } = await req.json();
+    const { jobDescription, profile, experiences, skills, education, certifications, publications, projects, professionalBodies } = await req.json();
 
     if (!jobDescription) {
       return new Response(JSON.stringify({ error: "Job description is required" }), {
@@ -47,34 +47,81 @@ ${experiences.map((e: any) => `- ${e.title} at ${e.company} (${e.period || "N/A"
 
     const skillsContext =
       skills && skills.length > 0
-        ? `Skills: ${skills.map((s: any) => s.name).join(", ")}`
+        ? `Skills: ${skills.map((s: any) => `${s.name}${s.category ? ` [${s.category}]` : ""}`).join(", ")}`
         : "No skills provided.";
+
+    const eduContext =
+      education && education.length > 0
+        ? `
+Education:
+${education.map((e: any) => `- ${e.degree} at ${e.institution} (${e.period || "N/A"}): ${e.description || ""}`).join("\n")}
+`
+        : "No education provided.";
+
+    const certContext =
+      certifications && certifications.length > 0
+        ? `
+Certifications:
+${certifications.map((c: any) => `- ${c.name} by ${c.issuer} (${c.date_obtained || "N/A"}): ${c.description || ""}`).join("\n")}
+`
+        : "No certifications provided.";
+
+    const pubContext =
+      publications && publications.length > 0
+        ? `
+Publications:
+${publications.map((p: any) => `- ${p.title} in ${p.publisher} (${p.date_published || "N/A"}): ${p.description || ""} ${p.url ? `URL: ${p.url}` : ""}`).join("\n")}
+`
+        : "No publications provided.";
+
+    const projContext =
+      projects && projects.length > 0
+        ? `
+Projects:
+${projects.map((p: any) => `- ${p.name}${p.role ? ` (${p.role})` : ""} (${p.period || "N/A"}): ${p.description || ""} ${p.url ? `URL: ${p.url}` : ""}`).join("\n")}
+`
+        : "No projects provided.";
+
+    const profBodyContext =
+      professionalBodies && professionalBodies.length > 0
+        ? `
+Professional Bodies:
+${professionalBodies.map((b: any) => `- ${b.name}${b.role ? ` - ${b.role}` : ""} (Member since: ${b.member_since || "N/A"}): ${b.description || ""}`).join("\n")}
+`
+        : "No professional bodies provided.";
 
     const systemPrompt = `You are an expert career consultant and ATS optimization specialist. You analyze job descriptions and generate tailored CVs and cover letters.
 
 You must return structured output using the provided tool.
 
-Guidelines:
+CRITICAL RULES:
+- You MUST use the candidate's REAL company names, job titles, and periods from their work experience. Do NOT invent or substitute companies/roles.
+- Rewrite descriptions to emphasize relevance to the target job, but keep the factual details (company, title, period) exactly as provided.
+- Include ALL sections: summary, experience, education, skills, certifications, publications, projects, professional bodies.
 - Extract key requirements from the job description
 - Match candidate experience and skills to requirements
 - Reorder and rephrase experience bullets to emphasize relevance
 - Use keywords from the job description naturally
 - Calculate an ATS match score (0-100) based on keyword coverage
-- Write a compelling, personalized cover letter
-- Keep the cover letter under 400 words
+- Write a compelling, personalized cover letter under 400 words
 - Use professional but engaging tone`;
 
     const userPrompt = `Here is the candidate's information:
 
 ${profileContext}
 ${expContext}
+${eduContext}
 ${skillsContext}
+${certContext}
+${pubContext}
+${projContext}
+${profBodyContext}
 
 Here is the job description to tailor the application for:
 
 ${jobDescription}
 
-Generate a tailored CV summary, optimized experience descriptions, and a personalized cover letter.`;
+Generate a complete tailored CV (summary, experience, education, skills, certifications, publications, projects, professional bodies) and a personalized cover letter. Use the candidate's REAL company names, titles, and periods exactly as provided.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -125,7 +172,79 @@ Generate a tailored CV summary, optimized experience descriptions, and a persona
                       },
                       required: ["title", "company", "period", "description"],
                     },
-                    description: "Reordered and rewritten experiences optimized for this job",
+                    description: "Reordered and rewritten experiences optimized for this job. MUST use real company names and titles from the candidate's profile.",
+                  },
+                  tailored_education: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        degree: { type: "string" },
+                        institution: { type: "string" },
+                        period: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["degree", "institution", "period", "description"],
+                    },
+                    description: "Education entries from the candidate's profile",
+                  },
+                  tailored_skills: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Relevant skills reordered by importance for this role",
+                  },
+                  tailored_certifications: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        issuer: { type: "string" },
+                        date_obtained: { type: "string" },
+                      },
+                      required: ["name", "issuer"],
+                    },
+                    description: "Relevant certifications from the candidate's profile",
+                  },
+                  tailored_publications: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        publisher: { type: "string" },
+                        date_published: { type: "string" },
+                      },
+                      required: ["title", "publisher"],
+                    },
+                    description: "Relevant publications from the candidate's profile",
+                  },
+                  tailored_projects: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        role: { type: "string" },
+                        period: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["name", "description"],
+                    },
+                    description: "Relevant projects from the candidate's profile",
+                  },
+                  tailored_professional_bodies: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        role: { type: "string" },
+                        member_since: { type: "string" },
+                      },
+                      required: ["name"],
+                    },
+                    description: "Professional body memberships from the candidate's profile",
                   },
                   cover_letter: {
                     type: "string",
@@ -146,6 +265,9 @@ Generate a tailored CV summary, optimized experience descriptions, and a persona
                   "keywords_total",
                   "tailored_summary",
                   "tailored_experiences",
+                  "tailored_education",
+                  "tailored_skills",
+                  "tailored_certifications",
                   "cover_letter",
                   "company_name",
                   "role_title",

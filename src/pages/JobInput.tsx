@@ -16,7 +16,7 @@ export default function JobInput() {
   const [jobText, setJobText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GeneratedApplication | null>(null);
-  const { profile, experiences, skills } = useProfile();
+  const { profile, experiences, education, skills, certifications, publications, projects, professionalBodies } = useProfile();
 
   const handleGenerate = async () => {
     if (!jobText.trim()) return;
@@ -28,8 +28,13 @@ export default function JobInput() {
         body: {
           jobDescription: jobText,
           profile: profile || {},
-          experiences: experiences || [],
-          skills: skills || [],
+          experiences: experiences.data || [],
+          skills: skills.data || [],
+          education: education.data || [],
+          certifications: certifications.data || [],
+          publications: publications.data || [],
+          projects: projects.data || [],
+          professionalBodies: professionalBodies.data || [],
         },
       });
 
