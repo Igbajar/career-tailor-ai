@@ -229,7 +229,7 @@ export function exportCoverLetterPdf(app: GeneratedApplication, profile: Profile
   doc.save(`Cover_Letter_${app.role_title.replace(/\s+/g, "_")}_${app.company_name.replace(/\s+/g, "_")}.pdf`);
 }
 
-
+export async function exportCvDocx(app: GeneratedApplication, profile: ProfileInfo) {
   const children: Paragraph[] = [];
 
   children.push(
@@ -262,7 +262,6 @@ export function exportCoverLetterPdf(app: GeneratedApplication, profile: Profile
   children.push(
     new Paragraph({ text: "EXPERIENCE", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
   );
-
   for (const exp of app.tailored_experiences) {
     children.push(
       new Paragraph({
@@ -279,6 +278,67 @@ export function exportCoverLetterPdf(app: GeneratedApplication, profile: Profile
     children.push(
       new Paragraph({ children: [new TextRun({ text: exp.description, size: 22, font: "Calibri" })], spacing: { after: 200 } })
     );
+  }
+
+  // Education
+  if (app.tailored_education?.length) {
+    children.push(
+      new Paragraph({ text: "EDUCATION", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    for (const edu of app.tailored_education) {
+      children.push(new Paragraph({ children: [new TextRun({ text: edu.degree, bold: true, size: 24, font: "Calibri" }), new TextRun({ text: `  —  ${edu.institution}`, size: 22, color: "555555", font: "Calibri" })], spacing: { before: 200 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: edu.period || "", italics: true, size: 20, color: "888888", font: "Calibri" })], spacing: { after: 100 } }));
+      if (edu.description) children.push(new Paragraph({ children: [new TextRun({ text: edu.description, size: 22, font: "Calibri" })], spacing: { after: 200 } }));
+    }
+  }
+
+  // Skills
+  if (app.tailored_skills?.length) {
+    children.push(
+      new Paragraph({ text: "SKILLS", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    children.push(new Paragraph({ children: [new TextRun({ text: app.tailored_skills.join("  •  "), size: 22, font: "Calibri" })], spacing: { after: 200 } }));
+  }
+
+  // Certifications
+  if (app.tailored_certifications?.length) {
+    children.push(
+      new Paragraph({ text: "CERTIFICATIONS", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    for (const c of app.tailored_certifications) {
+      children.push(new Paragraph({ children: [new TextRun({ text: `• ${c.name} — ${c.issuer}${c.date_obtained ? ` (${c.date_obtained})` : ""}`, size: 22, font: "Calibri" })], spacing: { after: 100 } }));
+    }
+  }
+
+  // Publications
+  if (app.tailored_publications?.length) {
+    children.push(
+      new Paragraph({ text: "PUBLICATIONS", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    for (const p of app.tailored_publications) {
+      children.push(new Paragraph({ children: [new TextRun({ text: `• ${p.title} — ${p.publisher}${p.date_published ? ` (${p.date_published})` : ""}`, size: 22, font: "Calibri" })], spacing: { after: 100 } }));
+    }
+  }
+
+  // Projects
+  if (app.tailored_projects?.length) {
+    children.push(
+      new Paragraph({ text: "PROJECTS", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    for (const p of app.tailored_projects) {
+      children.push(new Paragraph({ children: [new TextRun({ text: p.name, bold: true, size: 24, font: "Calibri" }), new TextRun({ text: p.role ? `  —  ${p.role}` : "", size: 22, color: "555555", font: "Calibri" })], spacing: { before: 200 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: p.description, size: 22, font: "Calibri" })], spacing: { after: 200 } }));
+    }
+  }
+
+  // Professional Bodies
+  if (app.tailored_professional_bodies?.length) {
+    children.push(
+      new Paragraph({ text: "PROFESSIONAL MEMBERSHIPS", heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 }, border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" } } })
+    );
+    for (const b of app.tailored_professional_bodies) {
+      children.push(new Paragraph({ children: [new TextRun({ text: `• ${b.name}${b.role ? ` — ${b.role}` : ""}${b.member_since ? ` (Since ${b.member_since})` : ""}`, size: 22, font: "Calibri" })], spacing: { after: 100 } }));
+    }
   }
 
   const doc = new Document({ sections: [{ children }] });
