@@ -90,23 +90,27 @@ ${professionalBodies.map((b: any) => `- ${b.name}${b.role ? ` - ${b.role}` : ""}
 `
         : "No professional bodies provided.";
 
-    const systemPrompt = `You are an expert career consultant and ATS optimization specialist. You analyze job descriptions and generate tailored CVs and cover letters.
+    const systemPrompt = `You are an expert career consultant, ATS optimization specialist, and recruitment strategist. You analyze job descriptions and generate perfectly tailored CVs and cover letters.
 
 You must return structured output using the provided tool.
 
-CRITICAL RULES:
-- You MUST use the candidate's REAL company names, job titles, and periods from their work experience. Do NOT invent or substitute companies/roles.
-- Rewrite descriptions to emphasize relevance to the target job, but keep the factual details (company, title, period) exactly as provided.
-- Include ALL sections: summary, experience, education, skills, certifications, publications, projects, professional bodies.
-- Extract key requirements from the job description
-- Match candidate experience and skills to requirements
-- Reorder and rephrase experience bullets to emphasize relevance
-- Use keywords from the job description naturally
-- Calculate an ATS match score (0-100) based on keyword coverage
-- Write a compelling, personalized cover letter under 400 words
-- Use professional but engaging tone`;
+CRITICAL RULES FOR TAILORING:
+1. **Use REAL data only**: You MUST use the candidate's REAL company names, job titles, periods, and education exactly as provided. NEVER invent or substitute companies, roles, degrees, or institutions.
+2. **Filter by relevance**: ONLY include experiences, education, skills, certifications, publications, projects, and professional bodies that are RELEVANT to the target job. Remove anything that doesn't strengthen the application.
+3. **Avoid over-qualification**: If the candidate has senior/executive experience but the role is mid-level, tone down language and focus on relevant transferable skills without making them appear overqualified. Don't list too many advanced credentials if the role doesn't require them.
+4. **Avoid under-qualification**: Highlight and emphasize all matching qualifications. Rewrite experience descriptions to draw out relevant responsibilities and achievements that align with job requirements.
+5. **ATS optimization**: 
+   - Extract exact keywords and phrases from the job description
+   - Weave these keywords naturally into the summary, experience descriptions, and skills
+   - Use standard section headings (Experience, Education, Skills, Certifications)
+   - Avoid graphics, tables, or unusual formatting descriptions
+6. **Experience rewriting**: Rewrite each included experience description to emphasize duties and achievements that match the job requirements. Use action verbs and quantify results where possible.
+7. **Skills curation**: Only include skills mentioned in or clearly relevant to the job description. Order them by relevance. Add skills the candidate likely has based on their experience that match job requirements.
+8. **Summary**: Write a targeted professional summary (3-4 sentences) that positions the candidate as an ideal fit for this specific role.
+9. **Cover letter**: Write a compelling, personalized cover letter under 400 words that connects the candidate's specific experience to the job requirements. Use professional but engaging tone.
+10. **Scoring**: Calculate ATS match score based on keyword coverage, skills alignment, and experience relevance. Be honest with the score.`;
 
-    const userPrompt = `Here is the candidate's information:
+    const userPrompt = `Here is the candidate's COMPLETE profile data. You must ONLY use real entries from this data — never invent companies, roles, or qualifications:
 
 ${profileContext}
 ${expContext}
@@ -117,11 +121,18 @@ ${pubContext}
 ${projContext}
 ${profBodyContext}
 
-Here is the job description to tailor the application for:
+Here is the TARGET job description:
 
 ${jobDescription}
 
-Generate a complete tailored CV (summary, experience, education, skills, certifications, publications, projects, professional bodies) and a personalized cover letter. Use the candidate's REAL company names, titles, and periods exactly as provided.`;
+INSTRUCTIONS:
+1. Carefully analyze the job requirements, responsibilities, and qualifications.
+2. SELECT ONLY the experiences, education, skills, certifications, publications, projects, and professional bodies from the candidate's profile that are RELEVANT to this specific job. OMIT irrelevant ones entirely.
+3. REWRITE the descriptions of selected experiences to highlight duties and achievements that align with the job requirements. Use keywords from the job description naturally.
+4. Ensure the CV is appropriately qualified — not overqualified or underqualified for the role level.
+5. Order everything by relevance to this job, not chronologically.
+6. Write a targeted professional summary and personalized cover letter.
+7. Calculate an honest ATS match score.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
