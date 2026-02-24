@@ -1,16 +1,11 @@
 import { motion } from "framer-motion";
-import { Briefcase, Upload, Sparkles, FileText, Send, Loader2, Download } from "lucide-react";
+import { Briefcase, Sparkles, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import {
-  GeneratedApplication,
-  exportCvPdf,
-  exportCoverLetterPdf,
-  exportCvDocx,
-  exportCoverLetterDocx,
-} from "@/lib/documentExport";
+import { GeneratedApplication } from "@/lib/documentExport";
+import GeneratedCvPreview from "@/components/GeneratedCvPreview";
 
 export default function JobInput() {
   const [jobText, setJobText] = useState("");
@@ -168,94 +163,12 @@ Include:
 
       {/* Generated Result */}
       {result && !isGenerating && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <h2 className="font-display text-xl font-semibold text-foreground flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-accent" />
-            Generated Documents
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tailored CV */}
-            <div className="glass-card rounded-xl p-5 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Tailored CV</h3>
-                  <p className="text-xs text-muted-foreground">ATS-optimized for this role</p>
-                </div>
-              </div>
-              <div className="rounded-lg bg-secondary/50 p-4 text-xs text-muted-foreground space-y-2">
-                <p className="font-semibold text-foreground text-sm">
-                  ATS Match Score: <span className="text-accent">{result.ats_score}%</span>
-                </p>
-                <p>• {result.keywords_matched} of {result.keywords_total} keywords matched</p>
-                <p>• Experience sections reordered by relevance</p>
-                <p>• Skills aligned with requirements</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => exportCvPdf(result, profileInfo)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  <Download className="w-3.5 h-3.5" /> PDF
-                </button>
-                <button
-                  onClick={() => exportCvDocx(result, profileInfo)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> DOCX
-                </button>
-              </div>
-            </div>
-
-            {/* Cover Letter */}
-            <div className="glass-card rounded-xl p-5 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
-                  <Send className="w-5 h-5 text-info" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Cover Letter</h3>
-                  <p className="text-xs text-muted-foreground">Personalized for {result.company_name}</p>
-                </div>
-              </div>
-              <div className="rounded-lg bg-secondary/50 p-4 text-xs text-muted-foreground leading-relaxed">
-                <p className="italic">
-                  "{result.cover_letter.substring(0, 200)}..."
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => exportCoverLetterPdf(result, profileInfo)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  <Download className="w-3.5 h-3.5" /> PDF
-                </button>
-                <button
-                  onClick={() => exportCoverLetterDocx(result, profileInfo)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> DOCX
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              onClick={handleSaveToTracker}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
-            >
-              Save to Application Tracker
-            </button>
-          </div>
-        </motion.div>
+        <GeneratedCvPreview
+          result={result}
+          profileInfo={profileInfo}
+          onSaveToTracker={handleSaveToTracker}
+          onResultUpdate={setResult}
+        />
       )}
     </div>
   );
