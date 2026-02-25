@@ -8,11 +8,13 @@ import {
   ClipboardList,
   LogOut,
   ChevronLeft,
-  Menu
+  Menu,
+  Users
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdmin } from "@/hooks/useAdmin";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -23,11 +25,18 @@ const navItems = [
   { to: "/tracker", icon: ClipboardList, label: "Application Tracker" },
 ];
 
+const adminNavItems = [
+  { to: "/admin/users", icon: Users, label: "Manage Users" },
+];
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
+
+  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -72,7 +81,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {navItems.map(({ to, icon: Icon, label }) => {
+          {allNavItems.map(({ to, icon: Icon, label }) => {
             const isActive = location.pathname === to;
             return (
               <NavLink

@@ -11,6 +11,7 @@ import CVManager from "./pages/CVManager";
 import JobInput from "./pages/JobInput";
 import Documents from "./pages/Documents";
 import Tracker from "./pages/Tracker";
+import AdminUsers from "./pages/AdminUsers";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/job-input" element={<ProtectedRoute><AppLayout><JobInput /></AppLayout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><AppLayout><Documents /></AppLayout></ProtectedRoute>} />
             <Route path="/tracker" element={<ProtectedRoute><AppLayout><Tracker /></AppLayout></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute><AppLayout><AdminUsers /></AppLayout></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
