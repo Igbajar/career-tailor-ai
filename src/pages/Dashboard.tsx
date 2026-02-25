@@ -1,20 +1,9 @@
 import { motion } from "framer-motion";
-import { FileText, Briefcase, ClipboardList, TrendingUp, Upload, Plus } from "lucide-react";
+import { FileText, Briefcase, ClipboardList, TrendingUp, Upload, Plus, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const stats = [
-  { label: "Applications", value: "12", icon: Briefcase, change: "+3 this week" },
-  { label: "Generated CVs", value: "8", icon: FileText, change: "2 pending" },
-  { label: "Interviews", value: "3", icon: TrendingUp, change: "+1 this week" },
-  { label: "Active Tracking", value: "5", icon: ClipboardList, change: "2 in progress" },
-];
-
-const recentApplications = [
-  { company: "Google", role: "Senior Frontend Engineer", status: "Interview", date: "Feb 18, 2026" },
-  { company: "Stripe", role: "Full Stack Developer", status: "Applied", date: "Feb 16, 2026" },
-  { company: "Notion", role: "Product Engineer", status: "Applied", date: "Feb 14, 2026" },
-  { company: "Vercel", role: "Software Engineer", status: "Offer", date: "Feb 12, 2026" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusColors: Record<string, string> = {
   Applied: "bg-info/10 text-info",
@@ -24,6 +13,35 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
+
+  const { data: applications = [], isLoading } = useQuery({
+    queryKey: ["dashboard_applications", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("job_applications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("applied_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const totalApps = applications.length;
+  const interviews = applications.filter((a: any) => a.status === "Interview").length;
+  const offers = applications.filter((a: any) => a.status === "Offer").length;
+
+  const stats = [
+    { label: "Applications", value: String(totalApps), icon: Briefcase, change: "" },
+    { label: "Generated CVs", value: String(applications.filter((a: any) => a.generated_data).length), icon: FileText, change: "" },
+    { label: "Interviews", value: String(interviews), icon: TrendingUp, change: "" },
+    { label: "Offers", value: String(offers), icon: ClipboardList, change: "" },
+  ];
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
@@ -64,7 +82,6 @@ export default function Dashboard() {
                 <stat.icon className="w-5 h-5 text-accent" />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">{stat.change}</p>
           </motion.div>
         ))}
       </div>
@@ -120,33 +137,45 @@ export default function Dashboard() {
             <h2 className="font-display text-lg font-semibold text-foreground">Recent Applications</h2>
             <Link to="/tracker" className="text-sm text-accent hover:underline">View all</Link>
           </div>
-          <div className="space-y-3">
-            {recentApplications.map((app, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 + i * 0.08 }}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center">
-                    <span className="text-sm font-bold text-primary">{app.company[0]}</span>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-accent" />
+            </div>
+          ) : applications.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground text-sm">No applications yet. Submit a job advert to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {applications.map((app: any, i: number) => (
+                <motion.div
+                  key={app.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 + i * 0.08 }}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center">
+                      <span className="text-sm font-bold text-primary">{app.company[0]}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{app.role}</p>
+                      <p className="text-xs text-muted-foreground">{app.company}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{app.role}</p>
-                    <p className="text-xs text-muted-foreground">{app.company}</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[app.status] || "bg-secondary text-secondary-foreground"}`}>
+                      {app.status}
+                    </span>
+                    <span className="text-xs text-muted-foreground hidden sm:block">
+                      {new Date(app.applied_at).toLocaleDateString()}
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[app.status]}`}>
-                    {app.status}
-                  </span>
-                  <span className="text-xs text-muted-foreground hidden sm:block">{app.date}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
