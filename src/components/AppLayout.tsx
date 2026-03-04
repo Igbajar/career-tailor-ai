@@ -9,7 +9,8 @@ import {
   LogOut,
   ChevronLeft,
   Menu,
-  Users
+  Users,
+  BarChart3
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ const navItems = [
 ];
 
 const adminNavItems = [
+  { to: "/admin/dashboard", icon: BarChart3, label: "Admin Dashboard" },
   { to: "/admin/users", icon: Users, label: "Manage Users" },
 ];
 

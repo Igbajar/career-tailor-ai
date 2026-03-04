@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { Search, Loader2, Trash2, Ban, CheckCircle } from "lucide-react";
+import { Search, Loader2, Trash2, Ban, CheckCircle, Eye } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
@@ -154,32 +154,41 @@ export default function AdminUsers() {
                         {new Date(p.created_at).toLocaleDateString()}
                       </td>
                       <td className="p-4">
-                        {!isCurrentUser && (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => suspendUser.mutate({ id: p.id, suspend: !p.is_suspended })}
-                              className="p-2 rounded-lg hover:bg-secondary transition-colors"
-                              title={p.is_suspended ? "Unsuspend" : "Suspend"}
-                            >
-                              {p.is_suspended ? (
-                                <CheckCircle className="w-4 h-4 text-success" />
-                              ) : (
-                                <Ban className="w-4 h-4 text-warning" />
-                              )}
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm("Delete this user's profile? This cannot be undone.")) {
-                                  deleteUser.mutate(p.id);
-                                }
-                              }}
-                              className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/admin/users/${p.user_id}`}
+                            className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4 text-accent" />
+                          </Link>
+                          {!isCurrentUser && (
+                            <>
+                              <button
+                                onClick={() => suspendUser.mutate({ id: p.id, suspend: !p.is_suspended })}
+                                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                                title={p.is_suspended ? "Unsuspend" : "Suspend"}
+                              >
+                                {p.is_suspended ? (
+                                  <CheckCircle className="w-4 h-4 text-success" />
+                                ) : (
+                                  <Ban className="w-4 h-4 text-warning" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm("Delete this user's profile? This cannot be undone.")) {
+                                    deleteUser.mutate(p.id);
+                                  }
+                                }}
+                                className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   );
