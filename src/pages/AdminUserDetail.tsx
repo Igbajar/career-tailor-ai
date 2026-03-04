@@ -2,8 +2,10 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2, FileText, Briefcase } from "lucide-react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
   Applied: "bg-info/10 text-info",
@@ -12,9 +14,12 @@ const statusColors: Record<string, string> = {
   Rejected: "bg-destructive/10 text-destructive",
 };
 
+const STATUS_OPTIONS = ["Applied", "Interview", "Offer", "Rejected"];
+
 export default function AdminUserDetail() {
   const { userId } = useParams<{ userId: string }>();
   const { isAdmin, isLoading: adminLoading } = useAdmin();
+  const queryClient = useQueryClient();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["admin_user_profile", userId],
@@ -42,6 +47,21 @@ export default function AdminUserDetail() {
       return data || [];
     },
     enabled: isAdmin && !!userId,
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ appId, status }: { appId: string; status: string }) => {
+      const { error } = await supabase
+        .from("job_applications")
+        .update({ status })
+        .eq("id", appId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin_user_applications", userId] });
+      toast.success("Status updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (adminLoading) {
@@ -126,9 +146,19 @@ export default function AdminUserDetail() {
                         <p className="text-sm text-muted-foreground">{app.company}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[app.status] || "bg-secondary text-secondary-foreground"}`}>
-                          {app.status}
-                        </span>
+                        <Select
+                          value={app.status}
+                          onValueChange={(val) => updateStatus.mutate({ appId: app.id, status: val })}
+                        >
+                          <SelectTrigger className={`h-7 w-auto text-xs font-medium rounded-full px-3 border-0 ${statusColors[app.status] || "bg-secondary text-secondary-foreground"}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         {app.ats_score != null && (
                           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent/10 text-accent">
                             ATS: {app.ats_score}%

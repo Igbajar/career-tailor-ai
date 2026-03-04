@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { Users, Briefcase, TrendingUp, Activity, Loader2 } from "lucide-react";
+import { Users, Briefcase, TrendingUp, Activity, Loader2, Download } from "lucide-react";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
   const { isAdmin, isLoading: adminLoading } = useAdmin();
@@ -66,6 +68,37 @@ export default function AdminDashboard() {
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
+  const exportCsv = async (type: "users" | "applications") => {
+    try {
+      if (type === "users") {
+        const { data, error } = await supabase.from("profiles").select("full_name, email, phone, location, linkedin, is_suspended, created_at");
+        if (error) throw error;
+        const rows = (data || []).map((p: any) => [p.full_name || "", p.email || "", p.phone || "", p.location || "", p.linkedin || "", p.is_suspended ? "Suspended" : "Active", p.created_at].join(","));
+        const csv = ["Name,Email,Phone,Location,LinkedIn,Status,Joined", ...rows].join("\n");
+        downloadCsv(csv, "users-export.csv");
+      } else {
+        const { data, error } = await supabase.from("job_applications").select("role, company, status, ats_score, location, salary_range, applied_at");
+        if (error) throw error;
+        const rows = (data || []).map((a: any) => [`"${a.role}"`, `"${a.company}"`, a.status, a.ats_score ?? "", `"${a.location || ""}"`, `"${a.salary_range || ""}"`, a.applied_at].join(","));
+        const csv = ["Role,Company,Status,ATS Score,Location,Salary,Applied At", ...rows].join("\n");
+        downloadCsv(csv, "applications-export.csv");
+      }
+      toast.success(`${type === "users" ? "Users" : "Applications"} exported`);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const downloadCsv = (csv: string, filename: string) => {
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const summaryCards = [
     { label: "Total Users", value: stats?.totalUsers ?? 0, icon: Users },
     { label: "Total Applications", value: stats?.totalApps ?? 0, icon: Briefcase },
@@ -80,6 +113,14 @@ export default function AdminDashboard() {
           Admin Dashboard
         </h1>
         <p className="text-muted-foreground mt-1">Platform overview and activity trends.</p>
+        <div className="flex gap-2 mt-3">
+          <Button variant="outline" size="sm" onClick={() => exportCsv("users")}>
+            <Download className="w-4 h-4 mr-1.5" /> Export Users
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCsv("applications")}>
+            <Download className="w-4 h-4 mr-1.5" /> Export Applications
+          </Button>
+        </div>
       </div>
 
       {/* Stats cards */}
