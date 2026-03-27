@@ -1,5 +1,6 @@
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Users, Briefcase, TrendingUp, Activity, Loader2, Download } from "lucide-react";
+import { Users, Briefcase, TrendingUp, Activity, Loader2, Download, CalendarIcon, Filter } from "lucide-react";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,56 +8,94 @@ import { Navigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { format, subMonths, subDays, startOfDay, endOfDay, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+type DateRange = { from: Date | undefined; to: Date | undefined };
 
 export default function AdminDashboard() {
   const { isAdmin, isLoading: adminLoading } = useAdmin();
+  const [preset, setPreset] = useState("6m");
+  const [customRange, setCustomRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["admin_stats"],
+  const dateRange = useMemo(() => {
+    if (preset === "custom" && customRange.from) {
+      return { from: startOfDay(customRange.from), to: endOfDay(customRange.to || new Date()) };
+    }
+    const now = new Date();
+    const presets: Record<string, Date> = {
+      "7d": subDays(now, 7),
+      "30d": subDays(now, 30),
+      "3m": subMonths(now, 3),
+      "6m": subMonths(now, 6),
+      "12m": subMonths(now, 12),
+    };
+    return { from: startOfDay(presets[preset] || subMonths(now, 6)), to: endOfDay(now) };
+  }, [preset, customRange]);
+
+  const { data: rawData, isLoading } = useQuery({
+    queryKey: ["admin_stats_raw"],
     queryFn: async () => {
       const [profilesRes, appsRes] = await Promise.all([
         supabase.from("profiles").select("id, created_at"),
         supabase.from("job_applications").select("id, status, applied_at, generated_data"),
       ]);
-      const profiles = profilesRes.data || [];
-      const apps = appsRes.data || [];
-
-      // Monthly signups (last 6 months)
-      const now = new Date();
-      const months: { label: string; users: number; applications: number }[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-        const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-        const users = profiles.filter((p: any) => {
-          const c = new Date(p.created_at);
-          return c >= d && c <= end;
-        }).length;
-        const applications = apps.filter((a: any) => {
-          const c = new Date(a.applied_at);
-          return c >= d && c <= end;
-        }).length;
-        months.push({ label, users, applications });
-      }
-
-      // Status breakdown
-      const statusCounts: Record<string, number> = {};
-      apps.forEach((a: any) => {
-        statusCounts[a.status] = (statusCounts[a.status] || 0) + 1;
-      });
-      const statusData = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
-
-      return {
-        totalUsers: profiles.length,
-        totalApps: apps.length,
-        totalCvs: apps.filter((a: any) => a.generated_data).length,
-        interviews: apps.filter((a: any) => a.status === "Interview").length,
-        months,
-        statusData,
-      };
+      return { profiles: profilesRes.data || [], apps: appsRes.data || [] };
     },
     enabled: isAdmin,
   });
+
+  const stats = useMemo(() => {
+    if (!rawData) return null;
+    const { profiles, apps } = rawData;
+    const { from, to } = dateRange;
+
+    const filteredProfiles = profiles.filter((p: any) => isWithinInterval(new Date(p.created_at), { start: from, end: to }));
+    const filteredApps = apps.filter((a: any) => {
+      const inRange = isWithinInterval(new Date(a.applied_at), { start: from, end: to });
+      const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+      return inRange && matchesStatus;
+    });
+
+    // Build monthly buckets
+    const months: { label: string; users: number; applications: number }[] = [];
+    let cursor = startOfMonth(from);
+    const end = endOfMonth(to);
+    while (cursor <= end) {
+      const mStart = startOfMonth(cursor);
+      const mEnd = endOfMonth(cursor);
+      const label = format(cursor, "MMM yy");
+      months.push({
+        label,
+        users: filteredProfiles.filter((p: any) => { const d = new Date(p.created_at); return d >= mStart && d <= mEnd; }).length,
+        applications: filteredApps.filter((a: any) => { const d = new Date(a.applied_at); return d >= mStart && d <= mEnd; }).length,
+      });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    const statusCounts: Record<string, number> = {};
+    filteredApps.forEach((a: any) => { statusCounts[a.status] = (statusCounts[a.status] || 0) + 1; });
+    const statusData = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+
+    return {
+      totalUsers: filteredProfiles.length,
+      totalApps: filteredApps.length,
+      totalCvs: filteredApps.filter((a: any) => a.generated_data).length,
+      interviews: filteredApps.filter((a: any) => a.status === "Interview").length,
+      months,
+      statusData,
+    };
+  }, [rawData, dateRange, statusFilter]);
+
+  const allStatuses = useMemo(() => {
+    if (!rawData) return [];
+    const set = new Set(rawData.apps.map((a: any) => a.status));
+    return Array.from(set).sort();
+  }, [rawData]);
 
   if (adminLoading || isLoading) {
     return (
@@ -123,6 +162,62 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="glass-card rounded-xl p-4 flex flex-wrap items-center gap-3">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <Select value={preset} onValueChange={setPreset}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Time range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="3m">Last 3 months</SelectItem>
+            <SelectItem value="6m">Last 6 months</SelectItem>
+            <SelectItem value="12m">Last 12 months</SelectItem>
+            <SelectItem value="custom">Custom range</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {preset === "custom" && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("gap-1.5", !customRange.from && "text-muted-foreground")}>
+                <CalendarIcon className="w-4 h-4" />
+                {customRange.from ? (
+                  customRange.to ? `${format(customRange.from, "MMM d")} – ${format(customRange.to, "MMM d, yyyy")}` : format(customRange.from, "MMM d, yyyy")
+                ) : "Pick dates"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={(range: any) => setCustomRange({ from: range?.from, to: range?.to })}
+                numberOfMonths={2}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[150px] h-9">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {allStatuses.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {format(dateRange.from, "MMM d, yyyy")} – {format(dateRange.to, "MMM d, yyyy")}
+        </span>
+      </div>
+
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryCards.map((card, i) => (
@@ -155,14 +250,7 @@ export default function AdminDashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
               <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  color: "hsl(var(--foreground))",
-                }}
-              />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} />
               <Line type="monotone" dataKey="users" stroke="hsl(var(--accent))" strokeWidth={2} name="Signups" />
               <Line type="monotone" dataKey="applications" stroke="hsl(var(--primary))" strokeWidth={2} name="Applications" />
             </LineChart>
@@ -176,14 +264,7 @@ export default function AdminDashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
               <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  color: "hsl(var(--foreground))",
-                }}
-              />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} />
               <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} name="Count" />
             </BarChart>
           </ResponsiveContainer>
